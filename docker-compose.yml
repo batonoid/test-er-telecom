@@ -1,0 +1,120 @@
+version: '3.1'
+
+
+networks:
+  test01:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  postgres_data: {} 
+
+services:
+
+  postgres:
+    image: postgres
+    container_name: postgres
+    restart: unless-stopped
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: jbpm
+      POSTGRES_USER: jbpm
+      POSTGRES_PASSWORD: jbpm
+    networks:      
+      - test01
+
+  jbpm:
+    image: jboss/jbpm-server-full
+    container_name: jbpm
+    restart: unless-stopped
+    environment:
+      JBPM_DB_DRIVER: postgres
+      JBPM_DB_HOST: postgres
+#    ports:
+#    - 8080:8080
+#    - 8001:8001
+    expose: 
+      - 8080
+    networks:      
+      - test01
+    depends_on:
+    - postgres
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+#    ports:     
+#    - 9090:9090
+    expose:
+      - 9090
+    networks:
+      - test01
+
+  nodeexporter:
+    image: prom/node-exporter
+    container_name: nodeexporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    expose:
+      - 9100
+    networks:
+      - test01
+
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
+    environment:
+      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+#      - GF_SERVER_DOMAIN=http://localhost
+#      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+#      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    restart: unless-stopped
+#    ports:     
+#    - 3000:3000
+    expose:
+      - 3000
+    networks:
+      - test01
+
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - ./nginx:/etc/nginx/conf.d
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    networks:
+      - test01
