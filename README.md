@@ -3,11 +3,11 @@
 docker-compose up -d 
 
 # Service availability
-- Gravana http://<ip/host>/grafana
+- Grafana http://<ip/host>/grafana
 - jBPM http://<ip/host>/ or http://<ip/host>/business-central/
 
 # Default credentials
-- Gravana admin admin
+- Grafana admin admin
 - jBPM wbadmin wbadmin
 
 # About project
